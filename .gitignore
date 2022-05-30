@@ -3,3 +3,4 @@ env
 firebaseCred.json
 __pycache__/
 model2.sav
+mask_rcnn_deepfashion2.h5

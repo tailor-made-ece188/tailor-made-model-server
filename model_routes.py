@@ -54,10 +54,6 @@ def resize_image(image):
     return image
 
 
-MODEL_DIR = os.path.join(ROOT_DIR, "logs")
-MODEL_PATH = "/content/drive/MyDrive/AI stuff/mask_rcnn_deepfashion2_0100.h5"
-
-
 class TestConfig(Config):
     NAME = "Deepfashion2"
     GPU_COUNT = 1
