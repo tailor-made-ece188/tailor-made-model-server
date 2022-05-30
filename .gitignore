@@ -1,0 +1,5 @@
+.env
+env
+firebaseCred.json
+__pycache__/
+model2.sav
