@@ -18,21 +18,19 @@ import colorsys
 import skimage
 import argparse
 import uuid
-from mrcnn.model import MaskRCNN
-import mrcnn.model as modellib
-from mrcnn.config import Config
-from mrcnn import model as modellib
-from mrcnn import utils
 import cv2
 import os
 import sys
 
 
-ROOT_DIR = os.path.relpath('./Mask_RCNN-master/')
-
+ROOT_DIR = os.path.abspath('/Users/matthewdev/CodingProjects/ECE188/tailor-made-model-server/Mask_RCNN-master/Mask_RCNN-master')
 # Import Mask RCNN
 sys.path.append(ROOT_DIR)  # To find local version of the library
-
+from mrcnn.model import MaskRCNN
+import mrcnn.model as modellib
+from mrcnn.config import Config
+from mrcnn import model as modellib
+from mrcnn import utils
 
 # firebase imports
 cred = credentials.Certificate(
@@ -42,23 +40,28 @@ default_app = initialize_app(
 print(default_app.name)
 
 
-# helper fns
-
-
-def resize_image(image):
-    # scale the image
-    image = tf.cast(image, tf.float32)
-    image = image/255.0
-    # resize image
-    image = tf.image.resize(image, (128, 128))
-    return image
-
-
 class TestConfig(Config):
     NAME = "Deepfashion2"
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
     NUM_CLASSES = 1 + 13
+
+model = modellib.MaskRCNN(mode="inference", config=TestConfig(), model_dir="/Users/matthewdev/CodingProjects/ECE188/tailor-made-model-server/")
+model.load_weights("./mask_rcnn_deepfashion2.h5", by_name=True)
+
+# helper fns
+
+
+# def resize_image(image):
+#     # scale the image
+#     image = tf.cast(image, tf.float32)
+#     image = image/255.0
+#     # resize image
+#     image = tf.image.resize(image, (128, 128))
+#     return image
+
+
+
 
 
 class_names = ['short_sleeved_shirt', 'long_sleeved_shirt', 'short_sleeved_outwear', 'long_sleeved_outwear', 'vest', 'sling',
@@ -93,7 +96,7 @@ def display_instances(image, boxes, masks, ids, names, scores):
     cropped_images = []
     image_to_crop = image.copy()
     n_instances = boxes.shape[0]
-    print("no of potholes in frame :", n_instances)
+    print("no of detections in frame :", n_instances)
     if not n_instances:
         print('NO INSTANCES TO DISPLAY')
     else:
@@ -122,39 +125,51 @@ def display_instances(image, boxes, masks, ids, names, scores):
 
 @app.route("/classifyImage", methods=['POST'])
 @auth_required
-def predict(uid):
-    image_url = ""
+def predictImage(uid):
+    # image_url = ""
     image_name = ""
     if request.is_json:
         try:
             json_data = request.get_json()
-            image_url = json_data['image_url']
             image_name = json_data['image_name']
         except:
-            return make_response(jsonify({"message": "Error, must include image url and name"}), 400)
+            return make_response(jsonify({"message": "Error, must include image name"}), 400)
     objID = ObjectId(uid)
     if not objID:
         return make_response(jsonify({'message': 'missing uid'}), 400)
-
+    image = db.images.find_one_or_404({"uid": objID, "image_name": image_name})
+    image_url=""
+    try:
+        image_url = image["uploaded_image"]
+    except:
+        return make_response(jsonify({'message': 'image missing url'}), 400)
     urllib.request.urlretrieve(image_url, "transferImage.jpg")
-    frame = cv2.imread("/content/transferImage.jpg")
+    frame = cv2.imread("./transferImage.jpg")
+    # print("FRAME")
+    # print(frame)
     results = model.detect([frame], verbose=0)
     r = results[0]
-    masked_image = display_instances(
+    masked_image, cropped_images = display_instances(
         frame, r['rois'], r['masks'], r['class_ids'], class_names, r['scores'])
-    cv2.imwrite("output.png", masked_image)
+    # masked_image = np.array(masked_image)
+    # print(masked_image)
+    # cv2.imshow('',masked_image)
+    cv2.imwrite("output.jpg", masked_image)
     bucket = storage.bucket("tailor-made-ece188.appspot.com")
     objId = ObjectId(uid)
     user = db.users.find_one_or_404({"_id": objId})
     username = user['username']
     blob = bucket.blob("images/" + username + "/" + image_name + "_classified")
-    blob.upload_from_filename("output.png")
+    blob.upload_from_filename("output.jpg")
     # Opt : if you want to make public access from the URL
     blob.make_public()
 
     print("your file url", blob.public_url)
     public_url = blob.public_url
-    # requests.post('https://tailor-made-ece188.herokuapp.com/addSegmentedImage', headers=)
+    prev_image = db.images.find_one_and_update(
+        {"uid": objID, "image_name": image_name},
+        {'$set': {"segmented_image": public_url}}
+    )
     return make_response(jsonify({"image_url": blob.public_url}), 200)
 
 # def classify(uid):

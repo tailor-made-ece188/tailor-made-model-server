@@ -9,7 +9,7 @@ app = Flask(__name__)
 app.config["MONGO_URI"] = os.environ.get("MONGO_URI", "")
 mongo = PyMongo(app)
 db = mongo.db
-unet = pickle.load(open('model2.sav', 'rb'))
+
 
 
 @app.route("/", methods=['GET'])
