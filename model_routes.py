@@ -159,27 +159,23 @@ def predictImage(uid):
     # print(masked_image)
     # cv2.imshow('',masked_image)
     cv2.imwrite("output.jpg", masked_image)
-    # bucket = storage.bucket("tailor-made-ece188.appspot.com")
-    # objId = ObjectId(uid)
-    # user = db.users.find_one_or_404({"_id": objId})
-    # username = user['username']
-    # blob = bucket.blob("images/" + username + "/" + image_name + "_classified")
-    # blob.upload_from_filename("output.jpg")
-    # # Opt : if you want to make public access from the URL
-    # blob.make_public()
+    bucket = storage.bucket("tailor-made-ece188.appspot.com")
+    objId = ObjectId(uid)
+    user = db.users.find_one_or_404({"_id": objId})
+    username = user['username']
+    blob = bucket.blob("images/" + username + "/" + image_name + "_classified")
+    blob.upload_from_filename("output.jpg")
+    # Opt : if you want to make public access from the URL
+    blob.make_public()
 
-    # print("your file url", blob.public_url)
-    # public_url = blob.public_url
+    print("your file url", blob.public_url)
+    public_url = blob.public_url
     prev_image = db.images.find_one_and_update(
         {"uid": objID, "image_name": image_name},
-        # TODO: PUT IN
-         # {'$set': {"segmented_image": public_url}, "confidences": confidences }
-         {'$set': {"confidences": confidences } }
+         {'$set': {"segmented_image": public_url, "confidences": confidences } }
     )
 
-    #TODO: THIS ONE
-    # return make_response(jsonify({"image_url": blob.public_url}), 200)
-    return make_response(jsonify({"image_url": "noice"}), 200)
+    return make_response(jsonify({"image_url": blob.public_url}), 200)
 
 # def classify(uid):
 #     url = ""
