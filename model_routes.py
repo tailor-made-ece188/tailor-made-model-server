@@ -65,7 +65,7 @@ model.load_weights("./mask_rcnn_deepfashion2.h5", by_name=True)
 
 
 class_names = ['short_sleeved_shirt', 'long_sleeved_shirt', 'short_sleeved_outwear', 'long_sleeved_outwear', 'vest', 'sling',
-               'shorts', 'pants', 'skirt', 'short_sleeved_dress', 'long_sleeved_dress',
+               'shorts', 'pants', 'skirt_or_pants', 'short_sleeved_dress', 'long_sleeved_dress',
                'vest_dress', 'sling_dress', '']
 
 
@@ -101,7 +101,7 @@ def display_instances(image, boxes, masks, ids, names, scores):
         print('NO INSTANCES TO DISPLAY')
     else:
         assert boxes.shape[0] == masks.shape[-1] == ids.shape[0]
-
+    obj_list = []
     for i in range(n_instances):
         if not np.any(boxes[i]):
             continue
@@ -112,6 +112,10 @@ def display_instances(image, boxes, masks, ids, names, scores):
         caption = '{} {:.2f}'.format(label, score) if score else label
         random_name = str(uuid.uuid4())
         mask = masks[:, :, i]
+        obj_list.append({
+            'score': int(score * 100),
+            'label': label
+        })
 
         cropped_images.append(image_to_crop[y1:y2, x1:x2])
 
@@ -120,7 +124,7 @@ def display_instances(image, boxes, masks, ids, names, scores):
         image = cv2.putText(image, caption, (x1, y1),
                             cv2.FONT_HERSHEY_DUPLEX, 0.7, color, 2)
 
-    return image, cropped_images
+    return image, cropped_images, obj_list
 
 
 @app.route("/classifyImage", methods=['POST'])
@@ -149,28 +153,33 @@ def predictImage(uid):
     # print(frame)
     results = model.detect([frame], verbose=0)
     r = results[0]
-    masked_image, cropped_images = display_instances(
+    masked_image, cropped_images, confidences = display_instances(
         frame, r['rois'], r['masks'], r['class_ids'], class_names, r['scores'])
     # masked_image = np.array(masked_image)
     # print(masked_image)
     # cv2.imshow('',masked_image)
     cv2.imwrite("output.jpg", masked_image)
-    bucket = storage.bucket("tailor-made-ece188.appspot.com")
-    objId = ObjectId(uid)
-    user = db.users.find_one_or_404({"_id": objId})
-    username = user['username']
-    blob = bucket.blob("images/" + username + "/" + image_name + "_classified")
-    blob.upload_from_filename("output.jpg")
-    # Opt : if you want to make public access from the URL
-    blob.make_public()
+    # bucket = storage.bucket("tailor-made-ece188.appspot.com")
+    # objId = ObjectId(uid)
+    # user = db.users.find_one_or_404({"_id": objId})
+    # username = user['username']
+    # blob = bucket.blob("images/" + username + "/" + image_name + "_classified")
+    # blob.upload_from_filename("output.jpg")
+    # # Opt : if you want to make public access from the URL
+    # blob.make_public()
 
-    print("your file url", blob.public_url)
-    public_url = blob.public_url
+    # print("your file url", blob.public_url)
+    # public_url = blob.public_url
     prev_image = db.images.find_one_and_update(
         {"uid": objID, "image_name": image_name},
-        {'$set': {"segmented_image": public_url}}
+        # TODO: PUT IN
+         # {'$set': {"segmented_image": public_url}, "confidences": confidences }
+         {'$set': {"confidences": confidences } }
     )
-    return make_response(jsonify({"image_url": blob.public_url}), 200)
+
+    #TODO: THIS ONE
+    # return make_response(jsonify({"image_url": blob.public_url}), 200)
+    return make_response(jsonify({"image_url": "noice"}), 200)
 
 # def classify(uid):
 #     url = ""
